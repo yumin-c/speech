@@ -1,4 +1,4 @@
-# gemma_speech
+# Alzheimer's disease speech classification
 
 Binary Alzheimer classification from speech, using a Wav2Vec2 encoder fused with hand crafted acoustic features.
 
