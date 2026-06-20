@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alzheimer Speech Demo</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libertinus+Sans" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --bg:      #ffffff;
+      --fg:      #111111;
+      --muted:   #666666;
+      --border:  #cccccc;
+      --hover:   #f4f4f4;
+      --alz-red: #c0392b;
+      --font:    "Libertinus Sans", "Courier New", Courier, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 1.7;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 24px 96px;
+    }
+
+    /* ── header ── */
+    header {
+      margin-bottom: 40px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+    header h1 { font-size: 21px; font-weight: normal; letter-spacing: 0.04em; margin-bottom: 6px; }
+    header p  { color: var(--muted); font-size: 14px; }
+    nav { margin-top: 12px; font-size: 14px; }
+    nav a { color: var(--fg); text-decoration: none; margin-right: 16px; }
+    nav a:hover { text-decoration: underline; }
+
+    /* ── section headings ── */
+    h2 {
+      font-size: 13px;
+      font-weight: normal;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin: 36px 0 16px;
+    }
+
+    /* ── buttons ── */
+    .btn-row { display: flex; gap: 8px; margin-bottom: 20px; }
+    button {
+      font-family: var(--font);
+      font-size: 14px;
+      background: var(--bg);
+      color: var(--fg);
+      border: 1px solid var(--fg);
+      padding: 6px 16px;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      transition: background 0.12s, color 0.12s;
+    }
+    button:hover  { background: var(--fg); color: var(--bg); }
+    button:disabled { opacity: 0.35; cursor: default; }
+    button.active { background: var(--fg); color: var(--bg); }
+
+    /* ── audio preview ── */
+    #audio-preview { display: none; width: 100%; margin-bottom: 20px; accent-color: var(--fg); }
+    #file-name { font-size: 13px; color: var(--muted); margin-bottom: 12px; min-height: 16px; }
+
+    /* ── waveform ── */
+    #waveform-wrap { display: none; margin-bottom: 12px; }
+    #waveform-wrap canvas { width: 100%; height: 56px; display: block; }
+    #rec-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.06em; }
+
+    /* ── spinner ── */
+    #spinner { display: none; font-size: 14px; color: var(--muted); margin: 16px 0; }
+
+    /* ── result box ── */
+    #result-box {
+      border: 1px solid var(--border);
+      padding: 24px;
+      display: none;
+      margin-top: 8px;
+    }
+    #result-label {
+      font-size: 28px;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    #result-label.alzheimer { color: var(--alz-red); }
+    #result-label.healthy   { color: #111111; }
+
+    #result-tagline {
+      font-size: 14px;
+      margin-bottom: 20px;
+      color: var(--muted);
+      font-style: italic;
+    }
+    #result-tagline.alzheimer { color: var(--alz-red); }
+
+    /* prob bars */
+    .bar-row { display: flex; align-items: center; margin-bottom: 10px; gap: 12px; }
+    .bar-label { width: 90px; font-size: 13px; color: var(--muted); flex-shrink: 0; }
+    .bar-track { flex: 1; height: 10px; background: #eeeeee; }
+    .bar-fill { height: 100%; background: var(--fg); transition: width 0.5s ease; }
+    .bar-fill.alzheimer { background: var(--alz-red); }
+    .bar-pct { width: 44px; font-size: 13px; text-align: right; flex-shrink: 0; }
+
+    /* stats grid */
+    #stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .stat-card { border: 1px solid var(--border); padding: 12px 14px; }
+    .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 4px; }
+    .stat-value { font-size: 22px; letter-spacing: 0.02em; }
+    .stat-desc  { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+    #result-meta {
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+
+    /* ── share section ── */
+    #share-section { display: none; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+    #share-section > p { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+    .share-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .insta-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: opacity 0.15s;
+    }
+    .insta-btn:hover { opacity: 0.88; color: #fff; }
+
+    .dl-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg);
+      color: var(--fg);
+      border: 1px solid var(--fg);
+      padding: 10px 20px;
+      font-family: var(--font);
+      font-size: 13px;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: background 0.12s, color 0.12s;
+    }
+    .dl-btn:hover { background: var(--fg); color: var(--bg); }
+
+    /* ── share card (exported as image) ── */
+    #share-card {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      width: 540px;
+      background: #fff;
+      padding: 44px 44px 36px;
+      font-family: "Courier New", Courier, monospace;
+      border: 2px solid #111;
+    }
+    #share-card .sc-header {
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 28px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #share-card .sc-header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #share-card .sc-logo {
+      height: 28px;
+      width: auto;
+      display: block;
+      opacity: 0.75;
+    }
+    #share-card .sc-verdict {
+      font-size: 36px;
+      font-weight: bold;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+    #share-card .sc-verdict.alzheimer { color: #c0392b; }
+    #share-card .sc-verdict.healthy   { color: #111; }
+    #share-card .sc-tagline {
+      font-size: 14px;
+      color: #555;
+      font-style: italic;
+      margin-bottom: 28px;
+    }
+    #share-card .sc-bar-wrap { margin-bottom: 24px; }
+    #share-card .sc-bar-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 10px;
+    }
+    #share-card .sc-bar-lbl { width: 100px; font-size: 12px; color: #777; }
+    #share-card .sc-bar-track { flex: 1; height: 12px; background: #eee; }
+    #share-card .sc-bar-fill  { height: 100%; background: #111; }
+    #share-card .sc-bar-fill.alzheimer { background: #c0392b; }
+    #share-card .sc-bar-pct   { width: 46px; font-size: 12px; text-align: right; color: #555; }
+    #share-card .sc-stats {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 28px;
+    }
+    #share-card .sc-stat {
+      border: 1px solid #ddd; padding: 10px 12px;
+    }
+    #share-card .sc-stat-lbl  { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #999; margin-bottom: 3px; }
+    #share-card .sc-stat-val  { font-size: 22px; }
+    #share-card .sc-stat-desc { font-size: 10px; color: #aaa; margin-top: 2px; }
+    #share-card .sc-footer {
+      font-size: 11px;
+      color: #bbb;
+      border-top: 1px solid #eee;
+      padding-top: 12px;
+      display: flex;
+      justify-content: space-between;
+    }
+    #share-card .sc-watermark {
+      font-size: 11px; color: #bbb; letter-spacing: 0.08em;
+    }
+
+    /* ── figures ── */
+    #figures-section img { width: 100%; border: 1px solid var(--border); margin-top: 8px; }
+
+    /* ── footer ── */
+    footer {
+      margin-top: 64px;
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    footer a { color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Alzheimer Speech Classification</h1>
+  <p>8th YAICON <i>Team The Elders</i></p>
+  <p>강태인 노승현 이재현 전윤서 정유민</p>
+  <nav>
+    <a href="#demo">[Demo]</a>
+    <a href="#method">[Method]</a>
+    <a href="#figures">[Results]</a>
+  </nav>
+</header>
+
+<!-- ── DEMO ── -->
+<section id="demo">
+  <h2>// Input</h2>
+
+  <div class="btn-row">
+    <button id="mic-btn" onclick="toggleMic()">record</button>
+    <button id="analyze-btn" onclick="analyze()" disabled>analyze</button>
+    <button id="clear-btn" onclick="clearAll()">clear</button>
+  </div>
+
+  <div id="waveform-wrap">
+    <div id="rec-label">recording...</div>
+    <canvas id="waveform-canvas"></canvas>
+  </div>
+
+  <div id="file-name"></div>
+  <audio id="audio-preview" controls></audio>
+  <div id="spinner">analyzing...</div>
+
+  <h2>// Output</h2>
+  <div id="result-box">
+
+    <div id="result-label">—</div>
+    <div id="result-tagline"></div>
+
+    <!-- prob bars -->
+    <div class="bar-row">
+      <div class="bar-label">Healthy</div>
+      <div class="bar-track"><div class="bar-fill" id="bar-healthy" style="width:0%"></div></div>
+      <div class="bar-pct" id="pct-healthy">—</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Alzheimer</div>
+      <div class="bar-track"><div class="bar-fill alzheimer" id="bar-alz" style="width:0%"></div></div>
+      <div class="bar-pct" id="pct-alz">—</div>
+    </div>
+
+    <!-- stats grid -->
+    <div id="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Percentile</div>
+        <div class="stat-value" id="stat-percentile">—</div>
+        <div class="stat-desc"  id="stat-percentile-desc"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">신뢰도</div>
+        <div class="stat-value" id="stat-conf">—</div>
+        <div class="stat-desc"  id="stat-conf-desc"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">False Alarm Rate</div>
+        <div class="stat-value" id="stat-fpr">12%</div>
+        <div class="stat-desc">건강한 사람을 치매라 부를 확률</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Miss Rate</div>
+        <div class="stat-value" id="stat-fnr">24%</div>
+        <div class="stat-desc">실제 치매를 놓칠 확률</div>
+      </div>
+    </div>
+
+    <div id="result-meta"></div>
+
+    <!-- share (알츠하이머 판정 시만 표시) -->
+    <div id="share-section">
+      <p>📸 결과 카드를 이미지로 내보내 인스타그램 스토리에 공유하세요</p>
+      <div id="share-preview-wrap" style="margin-bottom:12px;display:none;">
+        <img id="share-preview-img" style="width:100%;border:1px solid var(--border);" alt="share preview" />
+      </div>
+      <div class="share-btns">
+        <button class="insta-btn" onclick="shareInstagram()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+            <circle cx="12" cy="12" r="4"/>
+            <circle cx="17.5" cy="6.5" r="1" fill="#fff" stroke="none"/>
+          </svg>
+          인스타그램 스토리 공유
+        </button>
+        <button class="dl-btn" onclick="downloadCard()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          이미지 저장
+        </button>
+      </div>
+    </div>
+
+  </div><!-- end result-box -->
+</section>
+
+<!-- ── SHARE CARD (off-screen, rendered by html2canvas) ── -->
+<div id="share-card">
+  <div class="sc-header">
+    <span>Alzheimer Speech Classification</span>
+    <span class="sc-header-right">
+      <img src="data:image/png;base64,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" class="sc-logo" alt="YAI" />
+      <span id="sc-date"></span>
+    </span>
+  </div>
+  <div class="sc-verdict" id="sc-verdict">—</div>
+  <div class="sc-tagline" id="sc-tagline"></div>
+  <div class="sc-bar-wrap">
+    <div class="sc-bar-row">
+      <div class="sc-bar-lbl">Healthy</div>
+      <div class="sc-bar-track"><div class="sc-bar-fill" id="sc-bar-healthy" style="width:0%"></div></div>
+      <div class="sc-bar-pct" id="sc-pct-healthy">—</div>
+    </div>
+    <div class="sc-bar-row">
+      <div class="sc-bar-lbl">Alzheimer</div>
+      <div class="sc-bar-track"><div class="sc-bar-fill alzheimer" id="sc-bar-alz" style="width:0%"></div></div>
+      <div class="sc-bar-pct" id="sc-pct-alz">—</div>
+    </div>
+  </div>
+  <div class="sc-stats">
+    <div class="sc-stat">
+      <div class="sc-stat-lbl">Percentile</div>
+      <div class="sc-stat-val" id="sc-percentile">—</div>
+      <div class="sc-stat-desc" id="sc-percentile-desc"></div>
+    </div>
+    <div class="sc-stat">
+      <div class="sc-stat-lbl">신뢰도</div>
+      <div class="sc-stat-val" id="sc-conf">—</div>
+      <div class="sc-stat-desc" id="sc-conf-desc"></div>
+    </div>
+    <div class="sc-stat">
+      <div class="sc-stat-lbl">False Alarm Rate</div>
+      <div class="sc-stat-val">12%</div>
+      <div class="sc-stat-desc">건강한 사람을 치매라 부를 확률</div>
+    </div>
+    <div class="sc-stat">
+      <div class="sc-stat-lbl">Miss Rate</div>
+      <div class="sc-stat-val">24%</div>
+      <div class="sc-stat-desc">실제 치매를 놓칠 확률</div>
+    </div>
+  </div>
+  <div class="sc-footer">
+    <span>8th YAICON · Team The Elders</span>
+    <span class="sc-watermark">Wav2Vec2 + LoRA + Acoustic Fusion</span>
+  </div>
+</div>
+
+<!-- ── METHOD ── -->
+<section id="method">
+  <h2>// Method</h2>
+  <p>
+    Speech audio is encoded with
+    <strong>Wav2Vec2-large-960h</strong> (frozen) with
+    <strong>LoRA</strong> adapters (r=16, α=32) on attention projections.
+    Mean-pooled hidden states are concatenated with a
+    <strong>130-dim acoustic feature vector</strong>
+    (40 MFCCs × mean/std, F0 stats, RMS, spectral descriptors)
+    and passed through a two-layer classifier.
+  </p>
+  <br/>
+  <p>
+    Training data: Movement Disorders Voice Dataset —
+    Alzheimer (n=55) vs Healthy (n=76) speakers,
+    chunked to 10 s with 5 s hop, 4× augmentation per training file.
+  </p>
+</section>
+
+<!-- ── FIGURES ── -->
+<section id="figures">
+  <h2 id="figures-section">// Results — ROC Ablation</h2>
+  <img src="/figures/roc_ablation.png" alt="ROC Ablation Curve" />
+</section>
+
+<footer>
+  <p>
+    Yonsei University · 2026 ·
+    <a href="mailto:yumin.c@yonsei.ac.kr">yumin.c@yonsei.ac.kr</a>
+  </p>
+  <div id="gpu-stat" style="margin-top:10px;color:var(--muted);font-size:12px;font-family:monospace;">gpu —</div>
+</footer>
+
+<script>
+// ── state ──
+let audioBlob     = null;
+let mediaRecorder = null;
+let recordChunks  = [];
+let recording     = false;
+let audioCtx      = null;
+let analyser      = null;
+let animFrameId   = null;
+
+// ── operating-point stats (W2V+Acoustic, AUC=0.912, threshold=0.5) ──
+const MODEL_FPR = 0.12;  // false alarm rate from val set
+const MODEL_FNR = 0.24;  // miss rate from val set
+
+// ── waveform ──
+function startWaveform(stream) {
+  const canvas = document.getElementById('waveform-canvas');
+  const wrap   = document.getElementById('waveform-wrap');
+  wrap.style.display = 'block';
+  canvas.width  = canvas.offsetWidth  * devicePixelRatio;
+  canvas.height = canvas.offsetHeight * devicePixelRatio;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+
+  audioCtx = new AudioContext();
+  const src = audioCtx.createMediaStreamSource(stream);
+  analyser  = audioCtx.createAnalyser();
+  analyser.fftSize = 512;
+  src.connect(analyser);
+
+  const buf     = new Uint8Array(analyser.frequencyBinCount);
+  const history = new Array(W).fill(0);
+
+  function draw() {
+    animFrameId = requestAnimationFrame(draw);
+    analyser.getByteTimeDomainData(buf);
+    let rms = 0;
+    for (let i = 0; i < buf.length; i++) rms += (buf[i] - 128) ** 2;
+    rms = Math.sqrt(rms / buf.length);
+    const barH = Math.min(H * 0.92, (rms / 60) * H);
+    history.push(barH); if (history.length > W) history.shift();
+    ctx.clearRect(0, 0, W, H);
+    const barW = 2, gap = 1, cols = Math.floor(W / (barW + gap));
+    const start = history.length - cols;
+    for (let i = 0; i < cols; i++) {
+      const h = history[start + i] || 0;
+      ctx.fillStyle = `rgba(17,17,17,${(0.25 + i / cols * 0.75).toFixed(2)})`;
+      ctx.fillRect(i * (barW + gap), (H - h) / 2, barW, Math.max(1, h));
+    }
+  }
+  draw();
+}
+
+function stopWaveform() {
+  if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+  if (audioCtx)    { audioCtx.close(); audioCtx = null; }
+  document.getElementById('waveform-wrap').style.display = 'none';
+}
+
+// ── mic ──
+async function toggleMic() {
+  const btn = document.getElementById('mic-btn');
+  if (!recording) {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert('마이크는 localhost 또는 HTTPS 환경에서만 사용 가능합니다.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordChunks = [];
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => recordChunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        audioBlob = new Blob(recordChunks, { type: 'audio/wav' });
+        const url = URL.createObjectURL(audioBlob);
+        const prev = document.getElementById('audio-preview');
+        prev.src = url; prev.style.display = 'block';
+        document.getElementById('file-name').textContent = '마이크 녹음';
+        document.getElementById('analyze-btn').disabled = false;
+        stream.getTracks().forEach(t => t.stop());
+      };
+      mediaRecorder.start();
+      recording = true;
+      btn.textContent = 'stop'; btn.classList.add('active');
+      startWaveform(stream);
+    } catch (err) { alert('마이크 접근 거부: ' + err.message); }
+  } else {
+    mediaRecorder.stop();
+    recording = false;
+    btn.textContent = 'record'; btn.classList.remove('active');
+    stopWaveform();
+  }
+}
+
+// ── analyze ──
+async function analyze() {
+  if (!audioBlob) return;
+  document.getElementById('spinner').style.display   = 'block';
+  document.getElementById('result-box').style.display = 'none';
+  document.getElementById('analyze-btn').disabled = true;
+
+  const fd = new FormData();
+  fd.append('audio', audioBlob, 'input.wav');
+  try {
+    const resp = await fetch('/predict', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    showResult(data);
+  } catch (err) { alert('오류: ' + err.message); }
+  finally {
+    document.getElementById('spinner').style.display = 'none';
+    document.getElementById('analyze-btn').disabled = false;
+  }
+}
+
+// ── current result cache (used by share functions) ──
+let lastResult  = null;
+let lastTagline = '';
+
+// ── show result ──
+function showResult(data) {
+  const isAlz = data.label === 'Alzheimer';
+  lastResult = data;
+
+  // label
+  const label = document.getElementById('result-label');
+  label.textContent = isAlz ? '치매 의심 🚨' : '정상 ✅';
+  label.className   = isAlz ? 'alzheimer' : 'healthy';
+
+  // tagline (saved for share card)
+  const alzLines = [
+    '맙소사, 당신이 스마트폰을 쓰는 것이 신기할 지경입니다!',
+    '맙소사, 뭘 잘못 먹었습니까? 당신 머리가 은퇴 직전입니다.',
+  ];
+  const okLines = [
+    '정상입니다. 옆 사람도 테스트해 보세요 🎤',
+    '당신의 뇌는 아직 현역입니다.',
+    '정상이긴 한데.. 아직 모릅니다. 한번 더 검사해 보삼.',
+  ];
+  const pool = isAlz ? alzLines : okLines;
+  lastTagline = pool[Math.floor(Math.random() * pool.length)];
+
+  const tagline = document.getElementById('result-tagline');
+  tagline.textContent = lastTagline;
+  tagline.className   = isAlz ? 'alzheimer' : '';
+
+  // bars
+  const ph = (data.p_healthy   * 100).toFixed(1);
+  const pa = (data.p_alzheimer * 100).toFixed(1);
+  document.getElementById('bar-healthy').style.width = ph + '%';
+  document.getElementById('bar-alz').style.width     = pa + '%';
+  document.getElementById('pct-healthy').textContent = ph + '%';
+  document.getElementById('pct-alz').textContent     = pa + '%';
+
+  // stats
+  const score      = isAlz ? data.p_alzheimer : data.p_healthy;
+  const percentile = Math.round(score * 100);
+  document.getElementById('stat-percentile').textContent      = percentile + 'th';
+  document.getElementById('stat-percentile-desc').textContent = isAlz
+    ? `치매 의심 정도 상위 ${100 - percentile}%`
+    : `정상 점수 기준 상위 ${100 - percentile}%`;
+
+  const conf = data.confidence * 100;
+  document.getElementById('stat-conf').textContent      = conf.toFixed(1) + '%';
+  document.getElementById('stat-conf-desc').textContent =
+    conf >= 80 ? '높은 확신' : conf >= 60 ? '보통 확신' : '낮은 확신 — 재시도 권장';
+
+  document.getElementById('stat-fpr').textContent = (MODEL_FPR * 100).toFixed(0) + '%';
+  document.getElementById('stat-fnr').textContent = (MODEL_FNR * 100).toFixed(0) + '%';
+
+  // meta
+  document.getElementById('result-meta').textContent = `model: ${data.model}`;
+
+  // share — 항상 표시, 이전 미리보기는 숨김
+  document.getElementById('share-section').style.display = 'block';
+  document.getElementById('share-preview-wrap').style.display = 'none';
+
+  document.getElementById('result-box').style.display = 'block';
+}
+
+// ── populate off-screen share-card with current result ──
+function populateShareCard() {
+  if (!lastResult) return;
+  const isAlz = lastResult.label === 'Alzheimer';
+  const ph = (lastResult.p_healthy   * 100).toFixed(1);
+  const pa = (lastResult.p_alzheimer * 100).toFixed(1);
+
+  const v = document.getElementById('sc-verdict');
+  v.textContent = isAlz ? '치매 의심' : '정상';
+  v.className   = 'sc-verdict ' + (isAlz ? 'alzheimer' : 'healthy');
+
+  document.getElementById('sc-tagline').textContent = lastTagline;
+  document.getElementById('sc-date').textContent    = new Date().toLocaleDateString('ko-KR');
+
+  document.getElementById('sc-bar-healthy').style.width = ph + '%';
+  document.getElementById('sc-bar-alz').style.width     = pa + '%';
+  document.getElementById('sc-pct-healthy').textContent = ph + '%';
+  document.getElementById('sc-pct-alz').textContent     = pa + '%';
+
+  const score      = isAlz ? lastResult.p_alzheimer : lastResult.p_healthy;
+  const percentile = Math.round(score * 100);
+  document.getElementById('sc-percentile').textContent      = percentile + 'th';
+  document.getElementById('sc-percentile-desc').textContent = isAlz
+    ? `치매 의심 상위 ${100 - percentile}%` : `정상 기준 상위 ${100 - percentile}%`;
+
+  const conf = lastResult.confidence * 100;
+  document.getElementById('sc-conf').textContent      = conf.toFixed(1) + '%';
+  document.getElementById('sc-conf-desc').textContent =
+    conf >= 80 ? '높은 확신' : conf >= 60 ? '보통 확신' : '낮은 확신';
+}
+
+// ── render share-card → PNG blob via html2canvas ──
+async function renderCardBlob() {
+  if (!lastResult) return null;
+  populateShareCard();
+  const card = document.getElementById('share-card');
+
+  // Move card to current scroll position so html2canvas can reach it.
+  // (negative y causes partial capture regardless of width/height options)
+  const scrollY = window.scrollY || document.documentElement.scrollTop;
+  card.style.top  = scrollY + 'px';
+  card.style.left = '-9999px';
+
+  try {
+    const canvas = await html2canvas(card, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: '#ffffff',
+      logging: false,
+      scrollX: 0,
+      scrollY: -scrollY,     // compensate for scroll offset
+    });
+    return await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  } finally {
+    // Restore position
+    card.style.top  = '0';
+    card.style.left = '-9999px';
+  }
+}
+
+// ── Instagram Story share via Web Share API ──
+//
+// Web Share API (navigator.share + files) is the only reliable cross-platform
+// way to get an image into Instagram Stories from a web page.
+// On mobile it opens the native share sheet; the user taps Instagram →
+// the image lands directly in the Stories camera roll / sticker.
+//
+// The key constraint: navigator.share() MUST be called inside the original
+// user-gesture call stack. Awaiting an async operation first (e.g. canvas
+// rendering) breaks the gesture context in some browsers and causes silent
+// failures. We work around this by passing the renderCardBlob() Promise
+// directly to navigator.share() so the browser keeps the gesture alive.
+async function shareInstagram() {
+  if (!lastResult) { alert('먼저 분석을 실행해주세요.'); return; }
+  const btn = document.querySelector('.insta-btn');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ 이미지 생성 중...';
+
+  try {
+    // 1. Render card blob
+    const blob = await renderCardBlob();
+    const file = new File([blob], 'alzheimer-result.png', { type: 'image/png' });
+
+    // 2. Web Share API with image file — opens native share sheet
+    //    (iOS Safari 15+, Android Chrome 75+, Samsung Internet 12+)
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: 'AI 치매 검사 결과',
+        text: lastResult.label === 'Alzheimer'
+          ? '아들딸아, 내가 이제 치매라고 하는데 밥 사줘라. (AI 음성 분석)'
+          : 'AI 음성 분석 결과 정상! (의학적 진단 아님)',
+      });
+      // share sheet closed (user picked an app or cancelled)
+    } else {
+      // 3. Fallback: show preview image + guide toast
+      //    (Desktop Chrome, Firefox — Web Share API not supported)
+      showPcFallback(blob);
+    }
+  } catch (err) {
+    // AbortError = user dismissed share sheet — not an error
+    if (err.name !== 'AbortError') {
+      // DOMException: share() called without user gesture → should not
+      // happen here, but surface it clearly if it does
+      showPcFallback(await renderCardBlob().catch(() => null));
+      showToast('⚠️ 공유 시트를 열 수 없습니다. 이미지 저장 후 인스타그램에 직접 업로드하세요.');
+    }
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
+// ── PC / unsupported fallback ──
+function showPcFallback(blob) {
+  if (!blob) return;
+  const url = URL.createObjectURL(blob);
+  document.getElementById('share-preview-img').src = url;
+  document.getElementById('share-preview-wrap').style.display = 'block';
+  showToast('📱 이미지 저장 후 인스타그램 앱 → 스토리에서 업로드하세요.');
+}
+
+// ── non-blocking bottom toast ──
+function showToast(msg, durationMs = 7000) {
+  const id = 'share-toast';
+  const existing = document.getElementById(id);
+  if (existing) existing.remove();
+
+  const el = document.createElement('div');
+  el.id = id;
+  el.style.cssText = [
+    'position:fixed', 'bottom:24px', 'left:50%', 'transform:translateX(-50%)',
+    'background:#111', 'color:#fff', 'padding:12px 18px',
+    'font-size:13px', 'font-family:monospace', 'line-height:1.6',
+    'max-width:380px', 'width:92%', 'z-index:9999',
+    'box-shadow:0 4px 20px rgba(0,0,0,0.25)',
+    'display:flex', 'align-items:flex-start', 'gap:10px',
+  ].join(';');
+  el.innerHTML = `
+    <span style="flex:1">${msg}</span>
+    <button onclick="document.getElementById('${id}').remove()"
+      style="background:transparent;color:#aaa;border:none;font-size:16px;
+             cursor:pointer;padding:0;line-height:1;flex-shrink:0">✕</button>
+  `;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), durationMs);
+}
+
+// ── download card PNG ──
+async function downloadCard() {
+  if (!lastResult) { alert('먼저 분석을 실행해주세요.'); return; }
+  const btn = document.querySelector('.dl-btn');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ 저장 중...';
+
+  try {
+    const blob = await renderCardBlob();
+    const url  = URL.createObjectURL(blob);
+
+    // show inline preview
+    document.getElementById('share-preview-img').src = url;
+    document.getElementById('share-preview-wrap').style.display = 'block';
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'alzheimer-result.png';
+    a.click();
+  } catch (err) {
+    alert('저장 실패: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}%`
+    : `정상 점수 기준 상위 ${100 - percentile}%`;
+
+  const conf = data.confidence * 100;
+  document.getElementById('stat-conf').textContent      = conf.toFixed(1) + '%';
+  document.getElementById('stat-conf-desc').textContent =
+    conf >= 80 ? '높은 확신' : conf >= 60 ? '보통 확신' : '낮은 확신 — 재시도 권장';
+
+  // FPR/FNR are model-level constants; highlight if relevant
+  document.getElementById('stat-fpr').textContent =
+    (MODEL_FPR * 100).toFixed(0) + '%';
+  document.getElementById('stat-fnr').textContent =
+    (MODEL_FNR * 100).toFixed(0) + '%';
+
+  // meta
+  document.getElementById('result-meta').textContent = `model: ${data.model}`;
+
+  // share
+  document.getElementById('share-section').style.display = isAlz ? 'block' : 'none';
+
+  document.getElementById('result-box').style.display = 'block';
+}
+
+// ── kakao share ──
+function shareKakao(type) {
+  const msgs = {
+    parent: '당신은 치매입니다. 아들딸에게 결과를 공유하세요.\n(AI 음성 분석 결과 — 의학적 진단이 아닙니다)',
+    child:  '아들딸아, 내가 이제 치매라고 하는데 밥 사줘라.\n(AI 음성 분석 결과 — 의학적 진단이 아닙니다)',
+  };
+  const msg = msgs[type];
+  if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
+    window.location.href = 'kakaotalk://send?text=' + encodeURIComponent(msg);
+  } else {
+    navigator.clipboard.writeText(msg)
+      .then(() => alert('📋 클립보드에 복사됐습니다!\n카카오톡에 붙여넣기 하세요.\n\n' + msg))
+      .catch(() => prompt('아래 메시지를 복사해서 카카오톡에 보내세요:', msg));
+  }
+}
+
+// ── clear ──
+function clearAll() {
+  audioBlob = null;
+  document.getElementById('file-name').textContent = '';
+  const prev = document.getElementById('audio-preview');
+  prev.src = ''; prev.style.display = 'none';
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('result-box').style.display = 'none';
+}
+
+// ── GPU stat ──
+async function updateGpuStat() {
+  try {
+    const d = await (await fetch('/stats')).json();
+    const el = document.getElementById('gpu-stat');
+    if (!d.available) { el.textContent = 'gpu — n/a'; return; }
+    el.innerHTML = d.gpus.map((g, i) => {
+      const bar = '█'.repeat(Math.round(g.pct / 10)) + '░'.repeat(10 - Math.round(g.pct / 10));
+      return `gpu${d.gpus.length > 1 ? i : ''}  ${g.name}  [${bar}]  ${g.used_gb}/${g.total_gb} GB  (${g.pct}%)  util ${g.util_pct}%`;
+    }).join('<br>');
+  } catch (_) {}
+}
+updateGpuStat();
+setInterval(updateGpuStat, 10000);
+</script>
+</body>
+</html>
